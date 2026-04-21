@@ -1,0 +1,180 @@
+Tech Stack (tumpukan teknologi) yang akan kita gunakan untuk membangun proyek Sistem POS Minimarket ini. Berdasarkan arsitektur terpisah (Headless) yang sudah kita rancang, berikut adalah rincian teknologinya:
+1. Frontend (Antarmuka Pengguna & Mesin Kasir)
+Bagian ini beroperasi di browser komputer desktop toko Anda dan bertanggung jawab atas interaksi langsung dengan kasir dan admin.
+    Core Framework: React.js (Digunakan untuk membangun Single Page Application agar perpindahan halaman dan pemindaian barcode berjalan tanpa loading).
+    Styling / CSS: Tailwind CSS (Agar proses mendesain UI kasir dan admin berjalan cepat, rapi, dan konsisten sesuai referensi gambar Anda).
+    State Management: Zustand (atau Redux Toolkit)
+    (Sangat krusial untuk menyimpan data sementara "Keranjang Belanja" saat kasir menembak barcode berkali-kali tanpa membebani server).
+    Routing: React Router DOM (Untuk mengatur navigasi halaman antara /login, /pos, dan /admin).
+    HTTP Client: Axios (Untuk menembak/mengirim jalur data dari React ke API Laravel).
+2. Backend (Server API & Logika Bisnis)
+Bagian ini beroperasi di belakang layar, menangani keamanan, perhitungan akhir, dan komunikasi dengan basis data.
+    Core Framework: Laravel (PHP) (Bertindak sebagai penyedia RESTful API).
+    Database Management: Eloquent ORM (Sistem bawaan Laravel yang sangat aman untuk menangani relasi antar tabel dan transaksi pemotongan stok otomatis).
+    Authentication: Laravel Sanctum (Sistem keamanan berbasis token. Sangat cocok untuk mengamankan komunikasi API antara React dan Laravel).
+    Library Tambahan (Import/Export): Maatwebsite / Laravel Excel (Sesuai permintaan Anda untuk fitur import Master Data Barang dari file .xls atau .xlsx).
+3. Database (Penyimpanan Data)
+    Relational Database: mysql
+
+Berikut adalah rancangan awal struktur database (ORM) yang akan kita bangun di Laravel:
+1. Tabel products (Data Master Barang)
+Mengacu pada gambar halaman admin dan fitur import Excel Anda, tabel ini harus memiliki kolom yang sangat lengkap.
+    kode (String, Unique) - Barcode produk.
+    nama (String) - Nama produk.
+    deskripsi (Text, Nullable).
+    kategori_id (Foreign Key) - Berelasi ke tabel categories.
+    jumlah (Integer) - Stok saat ini.
+    satuan (String) - Pcs, Dus, dll.
+    harga_beli (Decimal/Integer).
+    harga_jual (Decimal/Integer).
+    suplier_id (Foreign Key) - Berelasi ke tabel suppliers.
+    lokasi (String) - Misalnya "Rak 01".
+    diskon_persen (Decimal/Integer).
+    stok_min (Integer) - Untuk trigger peringatan stok menipis.
+    expired_date (Date, Nullable) - Untuk keamanan produk makanan/minuman.
+
+2. Tabel transactions (Data Transaksi Utama)
+Mengacu pada antarmuka kasir dan struk nota, tabel ini akan merekam "kepala" dari setiap nota.
+    no_nota (String, Unique) - Misalnya: PJL20240624-0001.
+    tanggal (DateTime).
+    user_id (Foreign Key) - Kasir yang bertugas (misal: "Master").
+    pelanggan_id (Foreign Key, Nullable) - Mengacu ke tabel customers (misal: 0002 - Abinaya).
+    tipe_pembayaran (Enum) - Karena operasional Anda akan mengandalkan opsi kekinian, kita bisa mengatur enum ini menjadi: tunai, kredit, dan qris.
+    subtotal (Integer).
+    diskon_global (Integer) - Input diskon di bawah kiri.
+    pajak_persen (Integer) - Input tax %.
+    sumbangan (Integer) - Input sumbangan pembulatan.
+    grand_total (Integer).
+    bayar (Integer) - Nominal uang yang diterima.
+    kembali (Integer).
+
+3. Tabel transaction_details (Rincian Item Keranjang)
+Tabel ini akan menyimpan baris-baris barang dari nota yang tercetak.
+    transaction_id (Foreign Key) - Mengikat ke tabel transactions.
+    product_id (Foreign Key) - Mengikat ke tabel products.
+    jumlah (Integer) - Qty barang yang dibeli.
+    harga_satuan (Integer) - Mengunci harga saat transaksi terjadi (Harga Jadi).
+    diskon_item (Integer).
+    netto (Integer).
+    total (Integer) - Qty x Harga Satuan.
+
+4. Tabel Pendukung (Master Referensi)
+Agar data rapi dan tidak ada pengetikan yang salah saat import Excel, kita butuh tabel pendukung:
+    customers: Menyimpan kode, nama, alamat, dan sisa_piutang.
+    suppliers: Menyimpan kode dan nama.
+    categories: Menyimpan nama kategori (Makanan, Obat, Kosmetik, dll).
+
+
+5. Selain tabel products, transactions, transaction_details, customers, suppliers, dan categories yang sudah kita bahas, tambahkan tiga tabel krusial berikut di Laravel:
+    users (Data Pegawai & Hak Akses)
+        id (Primary Key)
+        name (String) - Nama lengkap pegawai.
+        username (String, Unique) - Untuk login.
+        password (String) - Hashed password.
+        role (Enum: 'admin', 'kasir') - Menentukan hak akses halaman.
+        is_active (Boolean) - Jika pegawai resign, cukup ubah ke false agar tidak bisa login tanpa menghapus riwayat transaksinya.
+
+    settings (Pengaturan Toko - Rekomendasi)
+    Mengingat pada gambar struk terdapat detail identitas toko, tabel ini berguna agar Anda tidak perlu membongkar coding jika ingin mengubah alamat atau pesan di bawah nota.
+        id (Primary Key)
+        key (String, Unique) - Contoh: nama_toko, alamat_toko, pesan_struk.
+        value (Text).
+
+    stock_opnames (Riwayat Penyesuaian Stok - Rekomendasi)
+    Pada gambar antarmuka admin yang Anda berikan, terdapat tab "STOK OPNAME". Tabel ini wajib ada untuk mencatat barang yang hilang atau rusak.
+        id (Primary Key)
+        product_id (Foreign Key)
+        user_id (Foreign Key) - Siapa yang melakukan opname.
+        stok_komputer (Integer) - Stok di sistem.
+        stok_fisik (Integer) - Stok hitungan tangan di rak.
+        selisih (Integer).
+        keterangan (String) - Misal: "Barang kedaluwarsa" atau "Kemasan rusak".
+
+
+Arsitektur Relasi Database (Eloquent ORM)
+
+Di dalam Model Laravel, relasi antar tabel harus didefinisikan dengan tegas untuk mempermudah pemanggilan data:
+    User (Kasir/Admin):
+        hasMany Transaction (Satu kasir bisa melayani banyak transaksi).
+        hasMany StockOpname.
+    Customer (Pelanggan):
+        hasMany Transaction (Satu pelanggan bisa punya banyak riwayat belanja).
+    Product (Barang):
+        belongsTo Category.
+        belongsTo Supplier.
+        hasMany TransactionDetail (Riwayat penjualan barang tersebut).
+        hasMany StockOpname.
+    Transaction (Nota Induk):
+        belongsTo User (Kasir yang mencetak).
+        belongsTo Customer (Opsional jika pelanggan umum).
+        hasMany TransactionDetail (Satu nota berisi banyak rincian barang).
+    TransactionDetail (Isi Keranjang):
+        belongsTo Transaction.
+        belongsTo Product.
+
+
+Arsitektur API (Routing RESTful)
+
+Karena aplikasi web ini mengadopsi struktur Headless (React dan Laravel terpisah), komunikasi data akan sepenuhnya menggunakan JSON melalui API. Mengantisipasi volume 30 hingga 100 transaksi harian di minimarket Anda, arsitektur endpoint ini dirancang agar ringan dan tidak membebani server:
+Modul Autentikasi (Laravel Sanctum)
+    POST /api/login - Menerbitkan token akses.
+    POST /api/logout - Mencabut token.
+    GET /api/user - Mengambil profil user yang sedang login beserta role-nya.
+Modul Master Data (Akses: Admin)
+    GET /api/products - Mengambil daftar barang (dilengkapi pagination agar browser tidak lag saat memuat ribuan baris).
+    POST /api/products - Menyimpan barang baru.
+    POST /api/products/import - Endpoint khusus untuk menerima unggahan file Excel dan memprosesnya secara massal.
+    PUT /api/products/{id} - Update data barang.
+    DELETE /api/products/{id} - Hapus barang.
+    (Berlaku pola yang sama untuk Categories, Suppliers, dan Customers).
+Modul Transaksi / Kasir (Akses: Kasir & Admin)
+    GET /api/pos/scan/{kode} - Mengembalikan detail produk berdasarkan barcode secara instan.
+    POST /api/transactions - Menyimpan objek keranjang belanja (Subtotal, Diskon, Grand Total, Bayar, Kembali) dan secara langsung memicu sistem pembayaran yang diinginkan, termasuk validasi untuk QRIS atau transaksi tunai.
+Modul Laporan & Opname
+    GET /api/reports/sales - Filter omzet berdasarkan rentang tanggal.
+    POST /api/opnames - Merekam selisih stok rak dan komputer.
+
+
+Berikut adalah rangkuman arsitektur konseptual untuk Sistem POS Minimarket Anda:
+1. Logika Bisnis (Business Logic)
+Ini adalah aturan main atau "hukum" baku yang tidak boleh dilanggar oleh sistem aplikasi Anda.
+    Aturan Stok (Inventory Rule): Barang tidak bisa dijual jika stok di sistem menunjukkan angka 0 (opsional, bisa disetting peringatan saja jika fisik ternyata ada). Penurunan stok wajib terjadi secara real-time tepat saat transaksi dibayar, bukan di akhir hari.
+    Aturan Transaksi (Transaction Rule): Sebuah struk/nota baru bisa dicetak hanya jika nilai pembayaran (Bayar) lebih besar atau sama dengan total belanja (Grand Total).
+    Aturan Harga (Pricing Rule): Harga yang terekam pada transaction_details adalah "Harga Jadi" (harga saat transaksi terjadi). Jika besok harga barang naik, data laporan transaksi hari ini tidak boleh ikut berubah.
+    Aturan Hak Akses (Role-Based Access):
+        Kasir: Hanya boleh membuka modul POS, mengubah jumlah barang di keranjang, dan memproses pembayaran. Tidak boleh menghapus nota yang sudah dicetak atau mengubah harga dasar barang.
+        Admin: Memiliki otoritas mutlak atas Master Data (ubah harga, tambah barang, sesuaikan stok fisik/opname) dan dapat melihat laporan laba rugi.
+2. Alur Aktivitas (Activity Flow / Use Case)
+Ini adalah langkah-langkah yang akan dilakukan oleh manusia (pengguna) di depan layar komputer Anda.
+A. Alur Kasir (Proses Penjualan Kasir):
+    Kasir login dan layar langsung memuat halaman utama POS.
+    Kasir menembak barcode menggunakan alat pemindai.
+    Sistem secara instan menambahkan barang ke daftar keranjang belanja di layar. (Jika barang di-scan 2 kali, Qty bertambah menjadi 2).
+    Kasir menanyakan metode pembayaran (Tunai atau QRIS).
+    Kasir memasukkan nominal uang yang diterima (atau konfirmasi QRIS).
+    Kasir menekan Enter atau tombol Simpan [F3].
+    Laci uang terbuka otomatis (jika ada hardware trigger), dan printer thermal mencetak struk belanja.
+    Layar keranjang kembali kosong, siap untuk pelanggan berikutnya.
+B. Alur Admin (Proses Import Data Barang):
+    Admin login dan diarahkan ke Dashboard utama.
+    Admin masuk ke menu "Master Barang" -> "Import Excel".
+    Admin mengunggah file berformat .xls / .xlsx sesuai template.
+    Sistem memvalidasi file (memastikan tidak ada barcode ganda).
+    Sistem menyuntikkan ratusan data tersebut ke database.
+    Layar menampilkan notifikasi "Import Sukses".
+3. Alur Data (Data Flow)
+Ini adalah perjalanan data di belakang layar, bagaimana React dan Laravel saling melempar informasi
+Skenario: Terjadi Satu Transaksi Pembayaran
+    [FRONTEND - React]: Data keranjang belanja dikumpulkan dari State Manager (Zustand/Redux). Data dibentuk menjadi paket JSON berisikan array barang, total, dan id kasir.
+    [NETWORK]: React mengirim JSON tersebut melalui fungsi POST ke endpoint API Laravel (misal: /api/transactions).
+    [BACKEND - Laravel]: Controller menerima JSON.
+    [DATABASE TRANSACTION - Sangat Krusial]: Laravel memulai mode DB::transaction().
+        Langkah A: Simpan kepala nota ke tabel transactions.
+        Langkah B: Lakukan looping array barang, lalu simpan ke tabel transaction_details.
+        Langkah C: Lakukan perintah DECREMENT (kurangi) nilai stok pada tabel products sesuai Qty yang dibeli.
+        Validasi: Jika A, B, dan C sukses, lakukan COMMIT (simpan permanen). Jika mati lampu atau koneksi putus di tengah jalan, lakukan ROLLBACK (batalkan semua, stok kembali utuh).
+    [RESPONSE]: Laravel mengirim status "200 OK" kembali ke React.
+    [FRONTEND - React]: React menerima status OK, mengosongkan State keranjang, lalu memicu fungsi cetak ke printer thermal.
+4. Spesifikasi Tambahan (dll)
+    Keamanan (Security Token): Sistem akan menggunakan Laravel Sanctum. Setiap kali Admin atau Kasir login, mereka mendapat "Kunci Token". Kunci ini dititipkan di dalam browser (Local Storage) dan akan selalu diselipkan oleh React setiap kali meminta data ke Laravel untuk membuktikan bahwa yang meminta adalah pegawai yang sah.
+    Manajemen Performa Layar Kasir: Untuk mencegah layar loading lambat, semua data barang (khusus barcode, nama, dan harga) idealnya ditarik sekali oleh React saat kasir pertama kali login, lalu disimpan di cache browser. Jadi saat kasir melakukan scan secara brutal/cepat, pencarian barang terjadi di memori lokal RAM komputer, bukan membebani server Laravel berkali-kali.
