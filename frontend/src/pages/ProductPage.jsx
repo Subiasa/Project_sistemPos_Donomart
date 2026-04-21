@@ -155,7 +155,9 @@ const ProductPage = () => {
                                 <th className="px-6 py-4">Satuan</th>
                                 <th className="px-6 py-4 text-right">Harga Beli</th>
                                 <th className="px-6 py-4 text-right">Harga Jual</th>
+                                <th className="px-6 py-4 text-center">Diskon</th>
                                 <th className="px-6 py-4">Suplier</th>
+                                <th className="px-6 py-4">Lokasi</th>
                                 <th className="px-6 py-4 text-center">Stok Min</th>
                                 <th className="px-6 py-4 text-center">Aksi</th>
                             </tr>
@@ -164,12 +166,12 @@ const ProductPage = () => {
                             {loading ? (
                                 [1,2,3,4,5].map(i => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan={11} className="px-6 py-4 bg-slate-50/50 h-16"></td>
+                                        <td colSpan={13} className="px-6 py-4 bg-slate-50/50 h-16"></td>
                                     </tr>
                                 ))
                             ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} className="px-6 py-16 text-center text-slate-400 bg-slate-50">
+                                    <td colSpan={13} className="px-6 py-16 text-center text-slate-400 bg-slate-50">
                                         <div className="flex flex-col items-center justify-center">
                                             <PackageSearch size={48} className="opacity-20 mb-3" />
                                             <span className="font-medium text-slate-500">Belum ada data barang ditemukan.</span>
@@ -181,7 +183,10 @@ const ProductPage = () => {
                                     <tr key={product.id} className="hover:bg-sky-50/30 transition-colors">
                                         <td className="px-6 py-4 text-slate-400 font-bold">{index + 1}</td>
                                         <td className="px-6 py-4 text-slate-500 font-mono text-xs">{product.kode}</td>
-                                        <td className="px-6 py-4 font-bold text-slate-700">{product.nama}</td>
+                                        <td className="px-6 py-4 font-bold text-slate-700">
+                                            {product.nama}
+                                            {product.deskripsi && <span className="block text-xs font-normal text-slate-400 mt-0.5 truncate max-w-[200px]">{product.deskripsi}</span>}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <span className="px-3 py-1 bg-sky-100/50 text-sky-700 text-[10px] font-black rounded-lg uppercase border border-sky-100">
                                                 {product.category?.nama || 'Umum'}
@@ -195,7 +200,9 @@ const ProductPage = () => {
                                         <td className="px-6 py-4 text-slate-500 text-xs font-bold">{product.satuan}</td>
                                         <td className="px-6 py-4 text-slate-400 text-right">Rp {Number(product.harga_beli || 0).toLocaleString()}</td>
                                         <td className="px-6 py-4 font-black text-slate-800 text-right">Rp {Number(product.harga_jual || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-slate-500">{product.supplier?.nama || '-'}</td>
+                                        <td className="px-6 py-4 text-center font-bold text-emerald-600">{product.diskon_persen || 0}%</td>
+                                        <td className="px-6 py-4 text-slate-500 text-xs font-bold">{product.supplier?.nama || '-'}</td>
+                                        <td className="px-6 py-4 text-slate-500 text-xs font-mono">{product.lokasi || '-'}</td>
                                         <td className="px-6 py-4 text-slate-400 text-center">{product.stok_min || 0}</td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex justify-center gap-2">
@@ -282,6 +289,25 @@ const ProductPage = () => {
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Expired Date</label>
                                         <input type="date" value={formData.expired_date} onChange={e => setFormData({...formData, expired_date: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 focus:bg-white outline-none transition-all font-medium" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Suplier</label>
+                                        <select value={formData.supplier_id} onChange={e => setFormData({...formData, supplier_id: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 focus:bg-white outline-none transition-all font-medium">
+                                            <option value="">Pilih Suplier...</option>
+                                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.nama}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Diskon Persen (%)</label>
+                                        <input type="number" onFocus={e => e.target.select()} value={formData.diskon_persen} onChange={e => setFormData({...formData, diskon_persen: e.target.value.replace(/^0+(?=\d)/, '')})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 focus:bg-white outline-none transition-all font-medium" />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Lokasi / Rak Penyimpanan</label>
+                                        <input type="text" value={formData.lokasi} onChange={e => setFormData({...formData, lokasi: e.target.value})} placeholder="Contoh: Rak C-21" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 focus:bg-white outline-none transition-all font-medium" />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Deskripsi Barang</label>
+                                        <textarea value={formData.deskripsi} onChange={e => setFormData({...formData, deskripsi: e.target.value})} placeholder="Penjelasan / rincian tambahan..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 focus:bg-white outline-none transition-all font-medium min-h-[80px]"></textarea>
                                     </div>
                                 </div>
                             </form>
