@@ -10,9 +10,20 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Product::with(['category', 'supplier'])->paginate(20));
+        $query = Product::with(['category', 'supplier']);
+
+        if ($request->has('search')) {
+            $searchTerm = $request->search;
+            $query->where('nama', 'like', "%{$searchTerm}%")
+                  ->orWhere('kode', 'like', "%{$searchTerm}%");
+        } elseif ($request->has('kode')) {
+            $query->where('kode', $request->kode);
+        }
+
+        // Increase pagination size for POS search dropdown to avoid missing items
+        return response()->json($query->paginate(50));
     }
 
     public function store(Request $request)
@@ -51,11 +62,33 @@ class ProductController extends Controller
 
     public function scan($kode)
     {
-        $product = Product::where('kode', $kode)->first();
+        $product = Product::where('kode', $kode)->orWhere('barcode_grosir', $kode)->first();
         if (!$product) {
             return response()->json(['message' => 'Produk tidak ditemukan.'], 404);
         }
         return response()->json($product);
+    }
+
+    public function getRestockAlerts()
+    {
+        $alerts = Product::with('supplier')
+            ->whereColumn('jumlah', '<=', 'stok_min')
+            ->get()
+            ->groupBy('supplier_id');
+
+        $formatted = [];
+        foreach($alerts as $supplierId => $products) {
+            $supplier = $products->first()->supplier;
+            $formatted[] = [
+                'supplier' => $supplier,
+                'products' => $products
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $formatted
+        ]);
     }
 
     public function import(Request $request)
